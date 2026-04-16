@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Radio, Play, Pause, SkipForward, AlertCircle, History, Volume2, Music2, Activity } from "lucide-react";
+import { Radio, Play, Pause, SkipForward, AlertCircle, History, Volume2, Music2, Activity, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { getRecommendedTracks, getTrackExplanation, type Track } from "../data/tracks";
+import { PreferencesModal } from "../components/preferences-modal";
 
 interface PlayedTrack {
   track: Track;
@@ -20,10 +21,11 @@ export function Player() {
   const [sessionTime, setSessionTime] = useState(0);
   const [trackProgress, setTrackProgress] = useState(0);
   const [showDistractedOptions, setShowDistractedOptions] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
   
-  const task = sessionStorage.getItem("deepwork-task") || "Coding";
-  const energy = parseInt(sessionStorage.getItem("deepwork-energy") || "50");
-  const musicPref = (sessionStorage.getItem("deepwork-music") || "Lo-Fi Beats") as Track["genre"];
+  const [task, setTask] = useState(sessionStorage.getItem("deepwork-task") || "Coding");
+  const [energy, setEnergy] = useState(parseInt(sessionStorage.getItem("deepwork-energy") || "50"));
+  const [musicPref, setMusicPref] = useState((sessionStorage.getItem("deepwork-music") || "Lo-Fi Beats") as Track["genre"]);
 
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -163,6 +165,31 @@ export function Player() {
     }
   };
 
+  const handleUpdatePreferences = (newTask: string, newEnergy: number, newMusicPref: Track["genre"]) => {
+    setTask(newTask);
+    setEnergy(newEnergy);
+    setMusicPref(newMusicPref);
+    
+    // Update session storage
+    sessionStorage.setItem("deepwork-task", newTask);
+    sessionStorage.setItem("deepwork-energy", newEnergy.toString());
+    sessionStorage.setItem("deepwork-music", newMusicPref);
+    
+    // Generate new playlist
+    const newPlaylist = getRecommendedTracks(newTask, newEnergy, newMusicPref);
+    setPlaylist(newPlaylist);
+    setCurrentTrackIndex(0);
+    setTrackProgress(0);
+    setTrackStartTime(sessionTime);
+    
+    setShowPreferences(false);
+    
+    toast.success("Preferences Updated", {
+      description: `New playlist generated for ${newTask}`,
+      duration: 3000,
+    });
+  };
+
   const handleEndSession = () => {
     // Save final track if playing
     if (currentTrack && trackProgress > 0) {
@@ -243,6 +270,13 @@ export function Player() {
               <span className="text-sm text-muted-foreground mr-2">Session</span>
               <span className="text-primary font-mono" style={{ fontWeight: 600 }}>{formatTime(sessionTime)}</span>
             </div>
+            <button
+              onClick={() => setShowPreferences(true)}
+              className="flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-lg hover:border-primary/50 transition-all"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="text-sm">Preferences</span>
+            </button>
             <button
               onClick={handleEndSession}
               className="flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-lg hover:border-primary/50 transition-all"
@@ -509,6 +543,19 @@ export function Player() {
                 </button>
               </motion.div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Preferences Modal */}
+        <AnimatePresence>
+          {showPreferences && (
+            <PreferencesModal
+              currentTask={task}
+              currentEnergy={energy}
+              currentMusicPref={musicPref}
+              onUpdate={handleUpdatePreferences}
+              onClose={() => setShowPreferences(false)}
+            />
           )}
         </AnimatePresence>
 
